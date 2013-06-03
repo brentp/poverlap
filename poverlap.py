@@ -11,9 +11,13 @@ from commandr import command, Run
 
 
 def mktemp(*args, **kwargs):
+    def rm(f):
+        try: os.unlink(f)
+        except OSError: pass
+
     if not 'suffix' in kwargs: kwargs['suffix'] = ".bed"
     f = _mktemp(*args, **kwargs)
-    atexit.register(os.unlink, f)
+    atexit.register(rm, f)
 
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
