@@ -18,6 +18,7 @@ def mktemp(*args, **kwargs):
     if not 'suffix' in kwargs: kwargs['suffix'] = ".bed"
     f = _mktemp(*args, **kwargs)
     atexit.register(rm, f)
+    return f
 
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
