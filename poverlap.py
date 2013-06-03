@@ -2,12 +2,13 @@
 import sys
 import os
 import argparse
-from multiprocessing import Pool
+from multiprocessing import Pool, cpu_count
 from toolshed import nopen
 from tempfile import mktemp as _mktemp
 import atexit
 from commandr import command, Run
 
+NCPUS = cpu_count()
 
 
 def mktemp(*args, **kwargs):
@@ -203,4 +204,8 @@ def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
     print ">", sims
 
 if __name__ == "__main__":
+    if "--ncpus" in sys.argv:
+        i = sys.argv.index("--ncpus")
+        sys.argv.pop(i)
+        NCPUS = int(sys.argv.pop(i))
     res = Run()
