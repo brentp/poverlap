@@ -61,7 +61,7 @@ p-value.
 
 The best way to understand is to use the script. E.g start with:
 
-    python poverlap.py poveralp
+    python poverlap.py poverlap
 
 When using shuffle_distance, `exclude`, `include` and `chrom` are ignored.
 Args that are not explicitly part of BEDTools are explained below, e.g. to
@@ -71,6 +71,7 @@ To shuffle intervals within a certain distance of their current location,
 use shuffle_distance to retain the local structure.
 
 Arguments:
+
     a - first bed file
     b - second bed file
     genome - genome file
