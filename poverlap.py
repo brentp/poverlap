@@ -51,7 +51,7 @@ def fixle(bed, atype, btype, type_col=4, n=1000):
     """
     type_col -= 1
     n_btypes = 0
-    pool = Pool(10)
+    pool = Pool(NCPUS)
     with open(mktemp(), 'w') as afh, \
             open(mktemp(), 'w') as ofh, \
             open(mktemp(), 'w') as bfh:
@@ -146,7 +146,7 @@ def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
         shuffle_distance - shuffle each interval to a random location within
                            this distance of its current location.
     """
-    pool = Pool(8)
+    pool = Pool(NCPUS)
 
     n = int(n)
     exclude = "" if exclude is None else ("-excl %s" % exclude)
