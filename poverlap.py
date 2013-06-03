@@ -1,9 +1,19 @@
-
-from toolshed import nopen
+#/usr/bin/env python
 import sys
-from multiprocessing import Pool
+import os
 import argparse
+from multiprocessing import Pool
+from toolshed import nopen
+from tempfile import mktemp as _mktemp
+import atexit
 from commandr import command, Run
+
+
+
+def mktemp(*args, **kwargs):
+    if not 'suffix' in kwargs: kwargs['suffix'] = ".bed"
+    f = _mktemp(*args, **kwargs)
+    atexit.register(os.unlink, f)
 
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
@@ -21,7 +31,7 @@ def extend_bed(fin, fout, bases):
     return fh.name
 
 @command('fixle') # from Haiminen et al in BMC Bioinformatics 2008, 9:336
-def fixle(bed, atype, btype, type_col=4, n=10):
+def fixle(bed, atype, btype, type_col=4, n=1000):
     """
     `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
     we keep the rows labeld as `atype` in the same locations, but we randomly
@@ -36,9 +46,9 @@ def fixle(bed, atype, btype, type_col=4, n=10):
     type_col -= 1
     n_btypes = 0
     pool = Pool(10)
-    with open('atype.bed', 'w') as afh, \
-            open('otypes.bed', 'w') as ofh, \
-            open('btypes.bed', 'w') as bfh:
+    with open(mktemp(), 'w') as afh, \
+            open(mktemp(), 'w') as ofh, \
+            open(mktemp(), 'w') as bfh:
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(bed)):
             if toks[type_col] == atype:
                 print >> afh, "\t".join(toks)
@@ -66,7 +76,7 @@ def fixle(bed, atype, btype, type_col=4, n=10):
 
 
 @command('bed-sample')
-def bed_sample(bed, n=100):
+def bed_sample(bed, n=1000):
     """
     choose n random lines from a bed file.
     uses reservoir sampling
@@ -103,7 +113,7 @@ def distance_shuffle(bed, dist=500000):
         print "\t".join(toks)
 
 @command('poverlap')
-def poverlap(a, b, genome=None, n=50, chrom=False, exclude=None, include=None,
+def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
         shuffle_both=False, overlap_distance=0, shuffle_distance=None):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
@@ -139,24 +149,26 @@ def poverlap(a, b, genome=None, n=50, chrom=False, exclude=None, include=None,
     if genome is None: assert shuffle_distance
 
     if exclude: # remove input regions that fall in exclude
-        run("bedtools intersect -v -a {a} -b {e} > aa.bed; echo 1"\
-                .format(a=a, e=exclude.split()[1]))
-        a = "aa.bed"
-        run("bedtools intersect -v -a {b} -b {e} > bb.bed; echo 1"\
-                .format(b=b, e=exclude.split()[1]))
-        b = "bb.bed"
+        tmp = mktemp()
+        run("bedtools intersect -v -a {a} -b {e} > {tmp}; echo 1"\
+                .format(a=a, e=exclude.split()[1], tmp=tmp))
+        a, tmp = tmp, mktemp()
+        run("bedtools intersect -v -a {b} -b {e} > {tmp}; echo 1"\
+                .format(b=b, e=exclude.split()[1], tmp=tmp))
+        b = tmp
 
     if include: # remove input regions that DONT fall in exclude
-        run("bedtools intersect -u -a {a} -b {i} > aaa.bed; echo 1"\
-                .format(a=a, i=include.split()[1]))
-        a = "aaa.bed"
-        run("bedtools intersect -u -a {b} -b {i} > bbb.bed; echo 1"\
-                .format(b=b, i=include.split()[1]))
-        b = "bbb.bed"
+        tmp = mktemp()
+        run("bedtools intersect -u -a {a} -b {i} > {tmp}; echo 1"\
+                .format(a=a, i=include.split()[1], tmp=tmp))
+        a, tmp = tmp, mktemp()
+        run("bedtools intersect -u -a {b} -b {i} > {tmp}; echo 1"\
+                .format(b=b, i=include.split()[1], tmp=tmp))
+        b = tmp
 
     if overlap_distance != 0:
-        a = extend_bed(a, 'aaaa.bed', overlap_distance)
-        b = extend_bed(b, 'bbbb.bed', overlap_distance)
+        a = extend_bed(a, mktemp(), overlap_distance)
+        b = extend_bed(b, mktemp(), overlap_distance)
 
     orig_cmd = "bedtools intersect -u -a {a} -b {b} | wc -l".format(**locals())
 
