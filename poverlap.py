@@ -10,7 +10,6 @@ from commandr import command, Run
 
 NCPUS = cpu_count()
 
-
 def mktemp(*args, **kwargs):
     def rm(f):
         try: os.unlink(f)
@@ -36,11 +35,12 @@ def extend_bed(fin, fout, bases):
             print >>fh, "\t".join(map(str, toks))
     return fh.name
 
-@command('fixle') # from Haiminen et al in BMC Bioinformatics 2008, 9:336
+@command('fixle')
 def fixle(bed, atype, btype, type_col=4, n=1000):
-    """
+    """\
+    from Haiminen et al in BMC Bioinformatics 2008, 9:336
     `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
-    we keep the rows labeld as `atype` in the same locations, but we randomly
+    we keep the rows labeled as `atype` in the same locations, but we randomly
     assign `btype` to any of the remaining rows.
     Arguments:
         bed - BED file with a column that delineates types
@@ -77,27 +77,25 @@ def fixle(bed, atype, btype, type_col=4, n=1000):
     print "> simulated overlap mean: %.1f" % (sum(sims) / float(len(sims)))
     print "> simulated p-value: %.3g" \
             % (sum((s >= observed) for s in sims) / float(len(sims)))
-
-    print sims
+    print ">", sims
 
 
 @command('bed-sample')
 def bed_sample(bed, n=1000):
-    """
-    choose n random lines from a bed file.
-    uses reservoir sampling
+    """\
+    choose n random lines from a bed file. uses reservoir sampling
     Arguments:
         bed - a bed file
-        n - number of lines to sample [default: %default]
+        n - number of lines to sample
     """
     n = int(n)
-    import random
+    from random import randint
     lines = []
     for i, line in enumerate(nopen(bed)):
         if i < n:
             lines.append(line)
         else:
-            replace_idx = random.randint(0, i)
+            replace_idx = randint(0, i)
             if replace_idx < n:
                 lines[replace_idx] = line
     print "".join(lines),
