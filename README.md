@@ -27,13 +27,13 @@ features:
 This is implemented as reservoir sampling. The command-line would look
 like:
         
-    python poverlap.py fixle wgEncodeRegTfbsClusteredV2.bed.gz CTCF Pol2 --n 10
+    ./poverlap.py fixle wgEncodeRegTfbsClusteredV2.bed.gz CTCF Pol2 --n 10
 
 For wgEncodeRegTfbsClusteredV2.bed.gz, which contains putative TFBS for
 50+ transcription factors. The output looks like this;
 
     > observed number of overlaps: 31572
-    > shuffle command: bedtools intersect -u -a atype.bed -b <(python poverlap.py bed-sample otypes.bed --n 76623) | wc -l
+    > shuffle command: bedtools intersect -u -a atype.bed -b <(./poverlap.py bed-sample otypes.bed --n 76623) | wc -l
     > simulated overlap mean: 29895.4
     > simulated p-value: 0
     [30147, 29782, 29835, 30023, 29943, 29844, 29567, 30286, 29868, 29659]
@@ -41,7 +41,60 @@ For wgEncodeRegTfbsClusteredV2.bed.gz, which contains putative TFBS for
 where, in this case, the shuffle command is repeated 10 times. We see that the
 observed overlap (31752) is higher than any of the simulated. So, the simulated
 p-value is 0.
+
+Examples
+========
     
+shuffle b to within X bases of original location
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+            --shuffle_distance 10000 \
+            > res.shuffle_distance-10kb.txt
+
+shuffle both a and b to within X bases of original location
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+            --shuffle_both --shuffle_distance 10000 \
+            > res.both.shuffle_distance-10kb.txt
+
+use Haiminen's method to shuffle to known sites. Here, a and b are a pair of TFs out of the
+50+ in the wgEncodeRegTfbsClusteredV2.bed.gz
+
+    ./poverlap.py fixle \
+        wgEncodeRegTfbsClusteredV2.bed.gz a.bed b.bed > res.fixle.haimenin.txt
+
+simple bedtools shuffle
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        -g hg19.genome > res.shuffle-bt.txt
+
+bedtools exclude:
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        -g hg19.genome --exclude repressed.encode.bed > res.shuffle_bt.exclude-repressed.txt
+
+bedtools include:
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        -g hg19.genome --include hg19.promoters.bed > res.shuffle_bt.include-promoters.txt
+
+bedtools include and exclude:
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        -g hg19.genome --include hg19.promoters.bed --exclude repressed.encode.bed \
+        > res.shuffle_bt.include-promoters.exclude-repressed.txt
+
+another include
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        -g hg19.genome --include wgEncodeRegTfbsClusteredV2.bed.gz > res.shuffle_bt.include-tfbs.txt
+
+
+Shuffle the intervals to within 40kb of their original location.
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+        --overlap_distance 40000 -g hg19.genome > res.shuffle-bt-within-40kb.txt
+
 Installation
 ============
 
@@ -61,7 +114,7 @@ p-value.
 
 The best way to understand is to use the script. E.g start with:
 
-    python poverlap.py poverlap
+    ./poverlap.py poverlap
 
 When using shuffle_distance, `exclude`, `include` and `chrom` are ignored.
 Args that are not explicitly part of BEDTools are explained below, e.g. to
@@ -83,3 +136,8 @@ Arguments:
     overlap_distance - intervals within this distance are overlapping.
     shuffle_distance - shuffle each interval to a random location within
                        this distance of its current location.
+
+ToDo
+====
+
+Allow metric other than wc -l.
