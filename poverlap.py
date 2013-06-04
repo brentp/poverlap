@@ -25,7 +25,7 @@ def run(cmd):
 
 def extend_bed(fin, fout, bases):
     bases /= 2
-    with open(fout, 'w') as fh:
+    with nopen(fout, 'w') as fh:
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(fin)):
             toks[1] = max(0, int(toks[1]) - bases)
             toks[2] = max(0, int(toks[2]) + bases)
@@ -52,9 +52,9 @@ def fixle(bed, atype, btype, type_col=4, n=1000):
     type_col -= 1
     n_btypes = 0
     pool = Pool(NCPUS)
-    with open(mktemp(), 'w') as afh, \
-            open(mktemp(), 'w') as ofh, \
-            open(mktemp(), 'w') as bfh:
+    with nopen(mktemp(), 'w') as afh, \
+            nopen(mktemp(), 'w') as ofh, \
+            nopen(mktemp(), 'w') as bfh:
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(bed)):
             if toks[type_col] == atype:
                 print >> afh, "\t".join(toks)
@@ -116,6 +116,28 @@ def distance_shuffle(bed, dist=500000):
         toks[1:3] = [str(max(0, int(loc) + d)) for loc in toks[1:3]]
         print "\t".join(toks)
 
+def zclude(bed, other, exclude=True):
+    """
+    include or exclude intervals from bed that overlap other
+    if exclude is True:
+        new = bedtools intersect -v -a bed -o other
+    """
+    if other is None: return bed
+    n_orig = sum(1 for _ in nopen(bed))
+    tmp = mktemp()
+    if exclude:
+        run("bedtools intersect -v -a {bed} -b {other} > {tmp}; echo 1"\
+                .format(**locals()))
+    else:
+        run("bedtools intersect -u -a {bed} -b {other} > {tmp}; echo 1"\
+                .format(**locals()))
+    n_after = sum(1 for _ in nopen(tmp))
+    clude = "exclud" if exclude else "includ"
+    pct = 100 * float(n_orig - n_after) / n_orig
+    print >>sys.stderr, ("reduced {bed} from {n_orig} to {n_after} "
+             "{pct:.3f}% by {clude}ing {other}").format(**locals())
+    return tmp
+
 @command('poverlap')
 def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
         shuffle_both=False, overlap_distance=0, shuffle_distance=None):
@@ -147,28 +169,15 @@ def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
     pool = Pool(NCPUS)
 
     n = int(n)
-    exclude = "" if exclude is None else ("-excl %s" % exclude)
-    include = "" if include is None else ("-incl %s" % include)
     chrom = "" if chrom is False else "-chrom"
     if genome is None: assert shuffle_distance
 
-    if exclude: # remove input regions that fall in exclude
-        tmp = mktemp()
-        run("bedtools intersect -v -a {a} -b {e} > {tmp}; echo 1"\
-                .format(a=a, e=exclude.split()[1], tmp=tmp))
-        a, tmp = tmp, mktemp()
-        run("bedtools intersect -v -a {b} -b {e} > {tmp}; echo 1"\
-                .format(b=b, e=exclude.split()[1], tmp=tmp))
-        b = tmp
+    # limit exclude and then to include
+    a = zclude(zclude(a, exclude, True), include, False)
+    b = zclude(zclude(b, exclude, True), include, False)
 
-    if include: # remove input regions that DONT fall in exclude
-        tmp = mktemp()
-        run("bedtools intersect -u -a {a} -b {i} > {tmp}; echo 1"\
-                .format(a=a, i=include.split()[1], tmp=tmp))
-        a, tmp = tmp, mktemp()
-        run("bedtools intersect -u -a {b} -b {i} > {tmp}; echo 1"\
-                .format(b=b, i=include.split()[1], tmp=tmp))
-        b = tmp
+    exclude = "" if exclude is None else ("-excl %s" % exclude)
+    include = "" if include is None else ("-incl %s" % include)
 
     if overlap_distance != 0:
         a = extend_bed(a, mktemp(), overlap_distance)
