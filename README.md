@@ -90,7 +90,8 @@ another include
         -g hg19.genome --include wgEncodeRegTfbsClusteredV2.bed.gz > res.shuffle_bt.include-tfbs.txt
 
 
-Shuffle the intervals to within 40kb of their original location.
+Call intervals within 40kb of another as "overlapping". Note, this is different
+from shuffle\_distance which determines where the interval can go.
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
         --overlap_distance 40000 -g hg19.genome > res.shuffle-bt-within-40kb.txt
