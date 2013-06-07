@@ -1,4 +1,4 @@
-#/usr/bin/env python
+#!/usr/bin/env python
 import sys
 import os
 from multiprocessing import cpu_count
@@ -9,6 +9,8 @@ import atexit
 from commandr import command, Run
 
 NCPUS = cpu_count()
+if NCPUS > 4: NCPUS -= 1
+
 
 def mktemp(*args, **kwargs):
     def rm(f):
@@ -20,8 +22,10 @@ def mktemp(*args, **kwargs):
     atexit.register(rm, f)
     return f
 
+
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
+
 
 def extend_bed(fin, fout, bases):
     bases /= 2
@@ -29,11 +33,12 @@ def extend_bed(fin, fout, bases):
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(fin)):
             toks[1] = max(0, int(toks[1]) - bases)
             toks[2] = max(0, int(toks[2]) + bases)
-            if toks[1] > toks[2]: # negative distances
+            if toks[1] > toks[2]:  # negative distances
                 toks[1] = toks[2] = (toks[1] + toks[2]) / 2
             assert toks[1] <= toks[2]
             print >>fh, "\t".join(map(str, toks))
     return fh.name
+
 
 @command('fixle')
 def fixle(bed, atype, btype, type_col=4, n=1000):
@@ -76,7 +81,7 @@ def fixle(bed, atype, btype, type_col=4, n=1000):
     sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
     print "> simulated overlap mean: %.1f" % (sum(sims) / float(len(sims)))
     print "> simulated p-value: %.3g" \
-            % (sum((s >= observed) for s in sims) / float(len(sims)))
+        % (sum((s >= observed) for s in sims) / float(len(sims)))
     print ">", sims
 
 
@@ -100,6 +105,7 @@ def bed_sample(bed, n=1000):
                 lines[replace_idx] = line
     print "".join(lines),
 
+
 @command('distance-shuffle')
 def distance_shuffle(bed, dist=500000):
     """
@@ -115,6 +121,7 @@ def distance_shuffle(bed, dist=500000):
         d = randint(-dist, dist)
         toks[1:3] = [str(max(0, int(loc) + d)) for loc in toks[1:3]]
         print "\t".join(toks)
+
 
 def zclude(bed, other, exclude=True):
     """
@@ -138,9 +145,11 @@ def zclude(bed, other, exclude=True):
              "{pct:.3f}% by {clude}ing {other}").format(**locals())
     return tmp
 
+
 @command('poverlap')
-def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None, include=None,
-        shuffle_both=False, overlap_distance=0, shuffle_distance=None):
+def poverlap(a, b, genome=None, n=1000, chrom=False, exclude=None,
+             include=None, shuffle_both=False, overlap_distance=0,
+             shuffle_distance=None):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
     and `b`. It performs `n` shufflings and compares the observed number of
