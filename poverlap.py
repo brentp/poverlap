@@ -1,8 +1,8 @@
 #/usr/bin/env python
 import sys
 import os
-import argparse
-from multiprocessing import Pool, cpu_count
+from multiprocessing import cpu_count
+from multiprocessing.dummy import Pool
 from toolshed import nopen
 from tempfile import mktemp as _mktemp
 import atexit
