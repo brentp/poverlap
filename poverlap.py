@@ -3,7 +3,7 @@ import sys
 import os
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool
-from toolshed import nopen
+from toolshed import nopen, reader
 from tempfile import mktemp as _mktemp
 import atexit
 from commandr import command, Run
@@ -11,6 +11,7 @@ from commandr import command, Run
 NCPUS = cpu_count()
 if NCPUS > 4: NCPUS -= 1
 
+SEP = "ZZZ"
 
 def mktemp(*args, **kwargs):
     def rm(f):
@@ -108,20 +109,65 @@ def bed_sample(bed, n=100):
 
 
 @command('distance-shuffle')
-def distance_shuffle(bed, dist=500000):
+def distance_shuffle(bed, loc='500000'):
     """
     randomize the location of each interval in `bed` by moving it's
     start location to within `dist` bp of its current location.
     Arguments:
         bed - input bed file
-        dist - shuffle intervals to within this distance (+ or -)
+        loc - shuffle intervals to within this distance (+ or -)
+               if not an integer, then this should be a BED file containing
+               regions such that each interval in `bed` is shuffled within
+               its containing interval in `dist`
     """
     from random import randint
-    dist = abs(int(dist))
-    for toks in (l.rstrip('\r\n').split('\t') for l in nopen(bed)):
-        d = randint(-dist, dist)
-        toks[1:3] = [str(max(0, int(loc) + d)) for loc in toks[1:3]]
-        print "\t".join(toks)
+    if str(loc).isdigit():
+        dist = abs(int(loc))
+        for toks in (l.rstrip('\r\n').split('\t') for l in nopen(bed)):
+            d = randint(-dist, dist)
+            toks[1:3] = [str(max(0, int(loc) + d)) for loc in toks[1:3]]
+            print "\t".join(toks)
+    else:
+        # we are using dist as the windows within which to shuffle
+        assert os.path.exists(loc)
+        bed4 = mktemp()
+        with open(bed4, 'w') as fh:
+            # this step is so we don't have to track the number of columns in a
+            for toks in reader(bed, header=False):
+                fh.write("%s\t%s\n" % ("\t".join(toks[:3]), SEP.join(toks)))
+
+        missing = 0
+        # we first find the b-interval that contains each a-interval by
+        # using bedtools intersect
+        for toks in reader("|bedtools intersect -wao -a {bed4} -b {loc}"
+                .format(**locals()), header=False):
+            ajoin = toks[:4]
+            a = ajoin[3].split(SEP)  # extract the full interval
+            b = toks[4:]
+
+            if int(b[-1]) == 0:
+                missing += 1
+                continue
+            assert a[0] == b[0], ('chroms dont match', a, b)
+
+            alen = int(a[2]) - int(a[1])
+            # doesn't care if the new interval is completely contained in b
+            astart = randint(int(b[1]), int(b[2]))
+
+            # subtract half the time.
+            aend = (astart + alen) if randint(0, 1) == 0 \
+                else (astart - alen)
+
+            if astart < aend:
+                a[1], a[2] = map(str, (astart, aend))
+            else:
+                a[2], a[1] = map(str, (astart, aend))
+
+            print "\t".join(a)
+        if missing > 0:
+            print >> sys.stderr, ("found {missing} intervals in {bed} that "
+                                  " were not contained in {loc}"
+                                  .format(**locals()))
 
 
 def zclude(bed, other, exclude=True):
@@ -134,10 +180,10 @@ def zclude(bed, other, exclude=True):
     n_orig = sum(1 for _ in nopen(bed))
     tmp = mktemp()
     if exclude:
-        run("bedtools intersect -v -a {bed} -b {other} > {tmp}; echo 1"\
+        run("bedtools intersect -v -a {bed} -b {other} > {tmp}; echo 1"
                 .format(**locals()))
     else:
-        run("bedtools intersect -u -a {bed} -b {other} > {tmp}; echo 1"\
+        run("bedtools intersect -u -a {bed} -b {other} > {tmp}; echo 1"
                 .format(**locals()))
     n_after = sum(1 for _ in nopen(tmp))
     clude = "exclud" if exclude else "includ"
@@ -150,18 +196,19 @@ def zclude(bed, other, exclude=True):
 @command('poverlap')
 def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None,
              include=None, shuffle_both=False, overlap_distance=0,
-             shuffle_distance=None):
+             shuffle_loc=None):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
     and `b`. It performs `n` shufflings and compares the observed number of
     lines in the intersection to the simulated intersections to generate a
     p-value.
-    When using shuffle_distance, `exclude`, `include` and `chrom` are ignored.
+    When using shuffle_loc, `exclude`, `include` and `chrom` are ignored.
     Args that are not explicitly part of BEDTools are explained below, e.g. to
     find intervals that are within a given distance, rather than fully
     overlapping, one can set overlap_distance to > 0.
     To shuffle intervals within a certain distance of their current location,
-    use shuffle_distance to retain the local structure.
+    or to keep then inside a set of intervals, use shuffle_loc to retain the
+    local structure.
 
     Arguments:
         a - first bed file
@@ -176,15 +223,18 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
         include - optional bed file of regions to include
         shuffle_both - if set, both a and b are shuffled. normally just b
         overlap_distance - intervals within this distance are overlapping.
-        shuffle_distance - shuffle each interval to a random location within
-                           this distance of its current location.
+        shuffle_loc - shuffle each interval to a random location within this
+                      distance of its current location. If not an integer,
+                      then this should be a BED file containing regions such
+                      that each interval in `bed` is shuffled within its
+                      containing interval in `dist`
     """
     pool = Pool(NCPUS)
     assert os.path.exists(genome), (genome, "not available")
 
     n = int(n)
     chrom = "" if chrom is False else "-chrom"
-    if genome is None: assert shuffle_distance
+    if genome is None: assert shuffle_loc
 
     # limit exclude and then to include
     a = zclude(zclude(a, exclude, True), include, False)
@@ -199,7 +249,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
 
     orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
 
-    if shuffle_distance is None:
+    if shuffle_loc is None:
         # use bedtools shuffle
         if shuffle_both:
             a = "<(bedtools shuffle {exclude} {include} -i {a} -g {genome} {chrom})".format(**locals())
@@ -208,12 +258,11 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
                 " {chrom}) | {metric} ".format(**locals()))
     else:
         # use python shuffle ignores --chrom and --genome
-        shuffle_distance = int(shuffle_distance)
         script = __file__
         if shuffle_both:
-            a = "<(python {script} distance-shuffle {a} --dist {shuffle_distance})".format(**locals())
+            a = "<(python {script} distance-shuffle {a} --loc {shuffle_loc})".format(**locals())
         shuf_cmd = ("bedtools intersect -wa -a {a} "
-            "-b <(python {script} distance-shuffle {b} --dist {shuffle_distance})"
+            "-b <(python {script} distance-shuffle {b} --loc {shuffle_loc})"
             " | {metric}").format(**locals())
 
     #print "original command: %s" % orig_cmd
