@@ -10,7 +10,7 @@ for ct in "${cell_types[@]}"; do
     echo $ct;
     remote=http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeBroadHmm/wgEncodeBroadHmm${ct}HMM.bed.gz
     F=$(basename $remote .gz)
-    #wget --quiet -O - $remote | zcat - | cut -f 1-4 | perl -pe 's/\d+_(.+)/$1/' > $F
+    wget --quiet -O - $remote | zcat - | cut -f 1-4 | perl -pe 's/\d+_(.+)/$1/' > $F
     files="$files $F"
 done
  

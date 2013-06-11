@@ -12,9 +12,9 @@ files=""
 for ct in "${cell_types[@]}"; do
     echo $ct;
     bb="http://ftp.ebi.ac.uk/pub/databases/ensembl/encode/awgHub/byDataType/segmentations/jan2011/${ct}.combined.bb"
-    #wget --quiet $bb;
+    wget --quiet $bb;
     F=$(basename $bb .bb)
-    #bigBedToBed $(basename $bb) stdout | cut -f 1-4 | gzip -c > ${F}.bedg.gz
+    bigBedToBed $(basename $bb) stdout | cut -f 1-4 | gzip -c > ${F}.bedg.gz
     files="$files ${F}.bedg.gz"
 done
  
