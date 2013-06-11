@@ -72,12 +72,12 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     assert n_btypes > 0, ("no intervals found for", btype)
 
     a, b, other = afh.name, bfh.name, ofh.name
-    orig_cmd = "bedtools intersect -u -a {a} -b {b} | {metric}".format(**locals())
+    orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
     observed = int(run(orig_cmd))
     print "> observed number of overlaps: %i" % observed
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
-    shuf_cmd = "bedtools intersect -u -a {a} -b {bsample} | {metric}".format(**locals())
+    shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample} | {metric}".format(**locals())
     print "> shuffle command: %s" % shuf_cmd
     sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
     print "> simulated overlap mean: %.1f" % (sum(sims) / float(len(sims)))
@@ -197,13 +197,13 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
         a = extend_bed(a, mktemp(), overlap_distance)
         b = extend_bed(b, mktemp(), overlap_distance)
 
-    orig_cmd = "bedtools intersect -u -a {a} -b {b} | {metric}".format(**locals())
+    orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
 
     if shuffle_distance is None:
         # use bedtools shuffle
         if shuffle_both:
             a = "<(bedtools shuffle {exclude} {include} -i {a} -g {genome} {chrom})".format(**locals())
-        shuf_cmd = ("bedtools intersect -u -a {a} "
+        shuf_cmd = ("bedtools intersect -wa -a {a} "
                 "-b <(bedtools shuffle {exclude} {include} -i {b} -g {genome}"
                 " {chrom}) | {metric} ".format(**locals()))
     else:
@@ -212,7 +212,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
         script = __file__
         if shuffle_both:
             a = "<(python {script} distance-shuffle {a} --dist {shuffle_distance})".format(**locals())
-        shuf_cmd = ("bedtools intersect -u -a {a} "
+        shuf_cmd = ("bedtools intersect -wa -a {a} "
             "-b <(python {script} distance-shuffle {b} --dist {shuffle_distance})"
             " | {metric}").format(**locals())
 
