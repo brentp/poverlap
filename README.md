@@ -51,14 +51,23 @@ Examples
 shuffle b to within X bases of original location
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-            --shuffle_distance 10000 \
-            > res.shuffle_distance-10kb.txt
+            --shuffle_loc 10000 \
+            > res.shuffle_loc-10kb.txt
 
 shuffle both a and b to within X bases of original location
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-            --shuffle_both --shuffle_distance 10000 \
-            > res.both.shuffle_distance-10kb.txt
+            --shuffle_both --shuffle_loc 10000 \
+            > res.both.shuffle_loc-10kb.txt
+
+we can also shuffle intervals in b to a random location within the interval
+that contains it in 'other.bed'. For example, b.bed may be transcription start
+sites and we wish to see what things look like if we randomize the location
+of the TSS to anywhere within the gene-body.
+
+    ./poverlap.py poverlap --a a.bed --b b.bed \
+            --shuffle_loc gene-bodies.bed \
+            > res.gene-bodies.txt
 
 use Haiminen's method to shuffle to known sites. Here, a and b are a pair of TFs out of the
 50+ in the wgEncodeRegTfbsClusteredV2.bed.gz
@@ -87,12 +96,6 @@ bedtools include and exclude:
         -g hg19.genome --include hg19.promoters.bed --exclude repressed.encode.bed \
         > res.shuffle_bt.include-promoters.exclude-repressed.txt
 
-another include
-
-    ./poverlap.py poverlap --a a.bed --b b.bed \
-        -g hg19.genome --include wgEncodeRegTfbsClusteredV2.bed.gz > res.shuffle_bt.include-tfbs.txt
-
-
 Call intervals within 40kb of another as "overlapping". Note, this is different
 from shuffle\_distance which determines where the interval can go.
 
@@ -120,12 +123,12 @@ The best way to understand is to use the script. E.g start with:
 
     ./poverlap.py poverlap
 
-When using shuffle_distance, `exclude`, `include` and `chrom` are ignored.
+When using shuffle_loc, `exclude`, `include` and `chrom` are ignored.
 Args that are not explicitly part of BEDTools are explained below, e.g. to
 find intervals that are within a given distance, rather than fully
 overlapping, one can set overlap_distance to > 0.
 To shuffle intervals within a certain distance of their current location,
-use shuffle_distance to retain the local structure.
+use shuffle_loc to retain the local structure.
 
 Arguments:
 
