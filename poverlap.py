@@ -160,8 +160,8 @@ def distance_shuffle(bed, loc='500000'):
             astart = randint(int(b[1]), int(b[2]))
 
             # subtract half the time.
-            aend = (astart + alen) if randint(0, 1) == 0 \
-                else (astart - alen)
+            aend = (astart - alen) if randint(0, 1) == 0 and astart > alen \
+                else (astart + alen)
 
             if astart < aend:
                 a[1], a[2] = map(str, (astart, aend))
