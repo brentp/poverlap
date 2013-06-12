@@ -12,6 +12,9 @@ features:
     location. This is a very basic start toward something like Bickels work for
     ENCODE that can preserve local structure
 
+    a) allows shuffing intervals in `a` to a new location inside the interval
+       that contains them in `b`.
+
  2) given the `a` and `b` BED files specified in order, the default is to
     shuffle only the `b` BED file. However, both files may be shuffled with
     `shuffle_both` argument to poverlap.
@@ -135,10 +138,8 @@ Arguments:
     include - optional bed file of regions to include
     shuffle_both - if set, both a and b are shuffled. normally just b
     overlap_distance - intervals within this distance are overlapping.
-    shuffle_distance - shuffle each interval to a random location within
-                       this distance of its current location.
-
-ToDo
-====
-
-Allow metric other than wc -l.
+    shuffle_loc - randomize the start of each interval to a random
+                  location within this distance of its current location.
+                   or if a BED file is given, then randomize the intervals in
+                   `b` to an random location within the containing interval in
+                   shuffle_loc
