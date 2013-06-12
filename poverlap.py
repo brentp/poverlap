@@ -113,17 +113,18 @@ def bed_sample(bed, n=100):
     print "".join(lines),
 
 
-@command('distance-shuffle')
-def distance_shuffle(bed, loc='500000'):
+@command('local-shuffle')
+def local_shuffle(bed, loc='500000'):
     """
     randomize the location of each interval in `bed` by moving it's
-    start location to within `dist` bp of its current location.
+    start location to within `loc` bp of its current location or to
+    it's containing interval in `loc`
     Arguments:
         bed - input bed file
         loc - shuffle intervals to within this distance (+ or -)
                if not an integer, then this should be a BED file containing
                regions such that each interval in `bed` is shuffled within
-               its containing interval in `dist`
+               its containing interval in `loc`
     """
     from random import randint
     if str(loc).isdigit():
@@ -263,9 +264,9 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
         # use python shuffle ignores --chrom and --genome
         script = __file__
         if shuffle_both:
-            a = "<(python {script} distance-shuffle {a} --loc {shuffle_loc})".format(**locals())
+            a = "<(python {script} local-shuffle {a} --loc {shuffle_loc})".format(**locals())
         shuf_cmd = ("bedtools intersect -wa -a {a} "
-            "-b <(python {script} distance-shuffle {b} --loc {shuffle_loc})"
+            "-b <(python {script} local-shuffle {b} --loc {shuffle_loc})"
             " | {metric}").format(**locals())
 
     #print "original command: %s" % orig_cmd
