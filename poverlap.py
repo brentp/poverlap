@@ -163,10 +163,8 @@ def distance_shuffle(bed, loc='500000'):
             aend = (astart - alen) if randint(0, 1) == 0 and astart > alen \
                 else (astart + alen)
 
-            if astart < aend:
-                a[1], a[2] = map(str, (astart, aend))
-            else:
-                a[2], a[1] = map(str, (astart, aend))
+            a[1], a[2] = map(str, (astart, aend) if astart < aend
+                             else (aend, astart))
 
             print "\t".join(a)
         if missing > 0:
