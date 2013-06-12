@@ -8,10 +8,13 @@ from tempfile import mktemp as _mktemp
 import atexit
 from commandr import command, Run
 
+from signal import signal, SIGPIPE, SIG_DFL
+signal(SIGPIPE,SIG_DFL)
+
 NCPUS = cpu_count()
 if NCPUS > 4: NCPUS -= 1
 
-SEP = "ZZZ"
+SEP = "&*#Z"
 
 def mktemp(*args, **kwargs):
     def rm(f):
@@ -29,6 +32,8 @@ def run(cmd):
 
 
 def extend_bed(fin, fout, bases):
+    # we're extending both a.bed and b.bed by this distance
+    # so divide by 2.
     bases /= 2
     with nopen(fout, 'w') as fh:
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(fin)):
@@ -181,10 +186,10 @@ def zclude(bed, other, exclude=True):
     tmp = mktemp()
     if exclude:
         run("bedtools intersect -v -a {bed} -b {other} > {tmp}; echo 1"
-                .format(**locals()))
+            .format(**locals()))
     else:
         run("bedtools intersect -u -a {bed} -b {other} > {tmp}; echo 1"
-                .format(**locals()))
+            .format(**locals()))
     n_after = sum(1 for _ in nopen(tmp))
     clude = "exclud" if exclude else "includ"
     pct = 100 * float(n_orig - n_after) / n_orig
