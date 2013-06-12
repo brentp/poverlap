@@ -11,3 +11,6 @@ for g in hg19 mm9; do
                 "select chrom, chromStart, chromEnd, type from $g.gap where type = 'centromere'"  > data/$g.centromere.bed
 done
 
+for db in hg18 hg19 mm8 mm9; do 
+    python data/get-gene-regions.py $db | sort -k1,1 -k2,2n > data/${db}.gene-features.bed;
+done
