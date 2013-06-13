@@ -7,6 +7,7 @@ from toolshed import nopen, reader
 from tempfile import mktemp as _mktemp
 import atexit
 from commandr import command, Run
+import json
 
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
@@ -80,16 +81,17 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     a, b, other = afh.name, bfh.name, ofh.name
     orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
     observed = int(run(orig_cmd))
-    print "> observed number of overlaps: %i" % observed
+    res = {"observed": observed }
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample} | {metric}".format(**locals())
-    print "> shuffle command: %s" % shuf_cmd
+    res['shuffle_cmd'] = shuf_cmd
+    res['metric'] = metric
     sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
-    print "> simulated overlap mean: %.1f" % (sum(sims) / float(len(sims)))
-    print "> simulated p-value: %.3g" \
-        % (sum((s >= observed) for s in sims) / float(len(sims)))
-    print ">", sims
+    res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
+    res['simulated_p'] = (sum((s >= observed) for s in sims) / float(len(sims)))
+    res['sims'] = sims
+    return json.dumps(res)
 
 
 @command('bed-sample')
@@ -270,13 +272,15 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
             " | {metric}").format(**locals())
 
     #print "original command: %s" % orig_cmd
-    print "> shuffle command: %s" % shuf_cmd
     observed = int(run(orig_cmd))
-    print "> observed number of overlaps: %i" % observed
+    res = {"observed": observed, "shuffle_cmd": shuf_cmd }
     sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
-    print "> simulated overlap mean: %.1f" % (sum(sims) / float(len(sims)))
-    print "> simulated p-value: %.3g" % (sum((s >= observed) for s in sims) / float(len(sims)))
-    print ">", sims
+    res['metric'] = metric
+    res['simulated mean metric'] = (sum(sims) / float(len(sims)))
+    res['simulated_p'] = \
+        (sum((s >= observed) for s in sims) / float(len(sims)))
+    res['sims'] = sims
+    return json.dumps(res)
 
 if __name__ == "__main__":
     if "--ncpus" in sys.argv:
