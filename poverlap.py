@@ -31,6 +31,32 @@ def mktemp(*args, **kwargs):
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
 
+def run_metric(cmd, metric=None):
+    """
+    metric can be a string, e.g. "wc -l" or a python callable that consumes
+    lines of input and returns a single value.
+    e.g.
+
+    def mymetric(fh):
+        val = 0
+        for line in fh:
+            val += float(line.split("\t")[4])
+        return val
+
+    the lines sent to the metric function will be the result of bedtools
+    intersect -wa -- so that both the -a and -b intervals will be present
+    in each line.
+    """
+
+    if metric is None:
+        cmd, metric = cmd
+    if isinstance(metric, basestring):
+        return float(run("%s | %s" % (cmd, metric)))
+    else:
+        res = metric(nopen("|%s" % cmd))
+        assert isinstance(res, (int, float))
+        return res
+
 
 def extend_bed(fin, fout, bases):
     # we're extending both a.bed and b.bed by this distance
@@ -45,7 +71,6 @@ def extend_bed(fin, fout, bases):
             assert toks[1] <= toks[2]
             print >>fh, "\t".join(map(str, toks))
     return fh.name
-
 
 @command('fixle')
 def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
@@ -79,15 +104,15 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     assert n_btypes > 0, ("no intervals found for", btype)
 
     a, b, other = afh.name, bfh.name, ofh.name
-    orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
-    observed = int(run(orig_cmd))
+    orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
+    observed = int(run_metric(orig_cmd, metric))
     res = {"observed": observed }
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
-    shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample} | {metric}".format(**locals())
+    shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
     res['shuffle_cmd'] = shuf_cmd
-    res['metric'] = metric
-    sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
+    res['metric'] = repr(metric)
+    sims = [int(x) for x in pool.imap(run, [(shuf_cmd, metric)] * n)]
     res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
     res['simulated_p'] = (sum((s >= observed) for s in sims) / float(len(sims)))
     res['sims'] = sims
@@ -253,7 +278,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
         a = extend_bed(a, mktemp(), overlap_distance)
         b = extend_bed(b, mktemp(), overlap_distance)
 
-    orig_cmd = "bedtools intersect -wa -a {a} -b {b} | {metric}".format(**locals())
+    orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
 
     if shuffle_loc is None:
         # use bedtools shuffle
@@ -261,7 +286,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
             a = "<(bedtools shuffle {exclude} {include} -i {a} -g {genome} {chrom})".format(**locals())
         shuf_cmd = ("bedtools intersect -wa -a {a} "
                 "-b <(bedtools shuffle {exclude} {include} -i {b} -g {genome}"
-                " {chrom}) | {metric} ".format(**locals()))
+                " {chrom})".format(**locals()))
     else:
         # use python shuffle ignores --chrom and --genome
         script = __file__
@@ -269,13 +294,12 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
             a = "<(python {script} local-shuffle {a} --loc {shuffle_loc})".format(**locals())
         shuf_cmd = ("bedtools intersect -wa -a {a} "
             "-b <(python {script} local-shuffle {b} --loc {shuffle_loc})"
-            " | {metric}").format(**locals())
+            ).format(**locals())
 
-    #print "original command: %s" % orig_cmd
-    observed = int(run(orig_cmd))
+    observed = run_metric(orig_cmd, metric)
     res = {"observed": observed, "shuffle_cmd": shuf_cmd }
-    sims = [int(x) for x in pool.imap(run, [shuf_cmd] * n)]
-    res['metric'] = metric
+    sims = [int(x) for x in pool.imap(run_metric, [(shuf_cmd, metric)] * n)]
+    res['metric'] = repr(metric)
     res['simulated mean metric'] = (sum(sims) / float(len(sims)))
     res['simulated_p'] = \
         (sum((s >= observed) for s in sims) / float(len(sims)))
