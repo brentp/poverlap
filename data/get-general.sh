@@ -14,3 +14,9 @@ done
 for db in hg18 hg19 mm8 mm9; do 
     python data/get-gene-regions.py $db | sort -k1,1 -k2,2n > data/${db}.gene-features.bed;
 done
+
+
+wget -O - ftp://encodeftp.cse.ucsc.edu/pipeline/hg19/wgEncodeRegTfbsClustered/release2/wgEncodeRegTfbsClusteredV2.bed.gz \
+    | zcat - \
+    | awk '{split($4, a, "_"); print $1"\t"$2"\t"$3"\t"a[1] }' \
+    | gzip -c > data/wgEncodeRegTfbsClusteredV2.bed.gz
