@@ -17,6 +17,7 @@ if NCPUS > 4: NCPUS -= 1
 
 SEP = "&*#Z"
 
+
 def mktemp(*args, **kwargs):
     def rm(f):
         try: os.unlink(f)
@@ -30,6 +31,7 @@ def mktemp(*args, **kwargs):
 
 def run(cmd):
     return list(nopen("|%s" % cmd.lstrip("|")))[0]
+
 
 def run_metric(cmd, metric=None):
     """
@@ -72,6 +74,7 @@ def extend_bed(fin, fout, bases):
             print >>fh, "\t".join(map(str, toks))
     return fh.name
 
+
 @command('fixle')
 def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     """\
@@ -106,7 +109,7 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     a, b, other = afh.name, bfh.name, ofh.name
     orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
     observed = int(run_metric(orig_cmd, metric))
-    res = {"observed": observed }
+    res = {"observed": observed}
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
@@ -114,7 +117,7 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     res['metric'] = repr(metric)
     sims = [int(x) for x in pool.imap(run, [(shuf_cmd, metric)] * n)]
     res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
-    res['simulated_p'] = (sum((s >= observed) for s in sims) / float(len(sims)))
+    res['simulated_p'] = sum((s >= observed) for s in sims) / float(len(sims))
     res['sims'] = sims
     return json.dumps(res)
 
@@ -127,9 +130,8 @@ def bed_sample(bed, n=100):
         bed - a bed file
         n - number of lines to sample
     """
-    n = int(n)
+    n, lines = int(n), []
     from random import randint
-    lines = []
     for i, line in enumerate(nopen(bed)):
         if i < n:
             lines.append(line)
@@ -158,7 +160,7 @@ def local_shuffle(bed, loc='500000'):
         dist = abs(int(loc))
         for toks in (l.rstrip('\r\n').split('\t') for l in nopen(bed)):
             d = randint(-dist, dist)
-            toks[1:3] = [str(max(0, int(loc) + d)) for loc in toks[1:3]]
+            toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
             print "\t".join(toks)
     else:
         # we are using dist as the windows within which to shuffle
@@ -173,7 +175,7 @@ def local_shuffle(bed, loc='500000'):
         # we first find the b-interval that contains each a-interval by
         # using bedtools intersect
         for toks in reader("|bedtools intersect -wao -a {bed4} -b {loc}"
-                .format(**locals()), header=False):
+                           .format(**locals()), header=False):
             ajoin = toks[:4]
             a = ajoin[3].split(SEP)  # extract the full interval
             b = toks[4:]
@@ -225,9 +227,9 @@ def zclude(bed, other, exclude=True):
 
 
 @command('poverlap')
-def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None,
-             include=None, shuffle_both=False, overlap_distance=0,
-             shuffle_loc=None):
+def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
+             exclude=None, include=None, shuffle_both=False,
+             overlap_distance=0, shuffle_loc=None):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
     and `b`. It performs `n` shufflings and compares the observed number of
@@ -283,21 +285,23 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False, exclude=None
     if shuffle_loc is None:
         # use bedtools shuffle
         if shuffle_both:
-            a = "<(bedtools shuffle {exclude} {include} -i {a} -g {genome} {chrom})".format(**locals())
-        shuf_cmd = ("bedtools intersect -wa -a {a} "
-                "-b <(bedtools shuffle {exclude} {include} -i {b} -g {genome}"
-                " {chrom})".format(**locals()))
+            a = ("<(bedtools shuffle {exclude} {include} -i {a} -g {genome} "
+                 "{chrom})".format(**locals()))
+        shuf_cmd = ("bedtools intersect -wa -a {a} -b "
+                    "<(bedtools shuffle {exclude} {include} -i {b} -g {genome}"
+                    " {chrom})".format(**locals()))
     else:
         # use python shuffle ignores --chrom and --genome
         script = __file__
         if shuffle_both:
-            a = "<(python {script} local-shuffle {a} --loc {shuffle_loc})".format(**locals())
-        shuf_cmd = ("bedtools intersect -wa -a {a} "
-            "-b <(python {script} local-shuffle {b} --loc {shuffle_loc})"
-            ).format(**locals())
+            a = "<(python {script} local-shuffle {a} --loc {shuffle_loc})"\
+                .format(**locals())
+        shuf_cmd = ("bedtools intersect -wa -a {a} -b "
+                    "<(python {script} local-shuffle {b} --loc {shuffle_loc})"
+                    ).format(**locals())
 
     observed = run_metric(orig_cmd, metric)
-    res = {"observed": observed, "shuffle_cmd": shuf_cmd }
+    res = {"observed": observed, "shuffle_cmd": shuf_cmd}
     sims = [int(x) for x in pool.imap(run_metric, [(shuf_cmd, metric)] * n)]
     res['metric'] = repr(metric)
     res['simulated mean metric'] = (sum(sims) / float(len(sims)))
