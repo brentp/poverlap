@@ -229,7 +229,7 @@ def zclude(bed, other, exclude=True):
 @command('poverlap')
 def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
              exclude=None, include=None, shuffle_both=False,
-             overlap_distance=0, shuffle_loc=None):
+             overlap_distance=0, shuffle_loc=None, ncpus=-1):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
     and `b`. It performs `n` shufflings and compares the observed number of
@@ -261,8 +261,19 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
                       then this should be a BED file containing regions such
                       that each interval in `bed` is shuffled within its
                       containing interval in `dist`
+        ncpus - number cpus to use. if a callable that does the parallelization
+                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
     """
-    pool = Pool(NCPUS)
+    if ncpus in ('1', 1, None):
+        pmap = map
+    elif isinstance(ncpus, (basestring, int)):
+        ncpus = int(ncpus)
+        if ncpus == -1: ncpus = cpu_count()
+        pmap = Pool(ncpus).imap
+    else:
+        pmap = ncpus
+        assert hasattr(pmap, "__call__"), pmap
+
     assert os.path.exists(genome), (genome, "not available")
 
     n = int(n)
@@ -302,7 +313,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
 
     observed = run_metric(orig_cmd, metric)
     res = {"observed": observed, "shuffle_cmd": shuf_cmd}
-    sims = [int(x) for x in pool.imap(run_metric, [(shuf_cmd, metric)] * n)]
+    sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, metric)] * n)]
     res['metric'] = repr(metric)
     res['simulated mean metric'] = (sum(sims) / float(len(sims)))
     res['simulated_p'] = \

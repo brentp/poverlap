@@ -26,3 +26,21 @@ def test_string_metric():
     assert isinstance(res, basestring)
     yield check_attributes, res
 
+def test_map_fn():
+    res = poverlap('test/data/a.bed', 'test/data/b.bed', 'data/hg19.genome',
+            metric='wc -l', n=20, ncpus=map)
+    assert isinstance(res, basestring)
+    yield check_attributes, res
+    from itertools import imap
+    res = poverlap('test/data/a.bed', 'test/data/b.bed', 'data/hg19.genome',
+            metric='wc -l', n=20, ncpus=imap)
+    assert isinstance(res, basestring)
+    yield check_attributes, res
+
+def test_cpu_count():
+
+    res = poverlap('test/data/a.bed', 'test/data/b.bed', 'data/hg19.genome',
+            metric='wc -l', n=20, ncpus=2)
+    assert isinstance(res, basestring)
+    yield check_attributes, res
+
