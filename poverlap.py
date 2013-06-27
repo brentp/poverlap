@@ -345,11 +345,6 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
     return json.dumps(full_res)
 
 def main():
-    if "--ncpus" in sys.argv:
-        global NCPUS
-        i = sys.argv.index("--ncpus")
-        sys.argv.pop(i)
-        NCPUS = int(sys.argv.pop(i))
     res = Run()
 
 if __name__ == "__main__":
