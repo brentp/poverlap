@@ -115,6 +115,8 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
+    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None))
+    """
     res['shuffle_cmd'] = shuf_cmd
     res['metric'] = repr(metric)
     sims = [int(x) for x in pmap(run, [(shuf_cmd, metric)] * n)]
@@ -122,6 +124,7 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     res['simulated_p'] = sum((s >= observed) for s in sims) / float(len(sims))
     res['sims'] = sims
     return json.dumps(res)
+    """
 
 
 @command('bed-sample')
@@ -328,6 +331,10 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         shuf_cmd = ("bedtools intersect -wa -a {a} -b "
                     "<(python {script} local-shuffle {b} --loc {shuffle_loc})"
                     ).format(**locals())
+
+    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
+
+def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
     if not isinstance(metric, (tuple, list)):
         metric = [metric]
     full_res = {}
@@ -341,8 +348,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
             (sum((s >= observed) for s in sims) / float(len(sims)))
         res['sims'] = sims
         full_res[repr(met)] = res
-
-    return json.dumps(full_res)
+    return full_res
 
 def main():
     res = Run()
