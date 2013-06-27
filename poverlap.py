@@ -30,8 +30,20 @@ def mktemp(*args, **kwargs):
 
 
 def run(cmd):
-    return list(nopen("|%s" % cmd.lstrip("|")))[0]
+    proc = nopen("|%s" % cmd.lstrip("|"), mode=None)
+    ret = proc.stdout.next()
+    check_proc(proc, cmd)
+    return ret
 
+def check_proc(proc, cmd=''):
+    err = proc.stderr.read().strip()
+    proc.terminate()
+    if proc.returncode not in (0, None):
+        sys.stderr.write("%s\n%s\n\%s" % (cmd, err, proc.returncode))
+        raise Exception(err)
+    if err: sys.stderr.write(err)
+    proc.stdout.close(); proc.stderr.close()
+    del proc
 
 def run_metric(cmd, metric=None):
     """
@@ -55,7 +67,9 @@ def run_metric(cmd, metric=None):
     if isinstance(metric, basestring):
         return float(run("%s | %s" % (cmd, metric)))
     else:
-        res = metric(nopen("|%s" % cmd))
+        proc = nopen("|%s" % cmd, mode=None)
+        res = metric(proc.stdout)
+        check_proc(proc, cmd)
         assert isinstance(res, (int, float))
         return res
 
@@ -126,14 +140,15 @@ def bed_sample(bed, n=100):
     """
     n, lines = int(n), []
     from random import randint
-    for i, line in enumerate(nopen(bed)):
-        if i < n:
-            lines.append(line)
-        else:
-            replace_idx = randint(0, i)
-            if replace_idx < n:
-                lines[replace_idx] = line
-    print "".join(lines),
+    with nopen(bed) as fh:
+        for i, line in enumerate(nopen(fh)):
+            if i < n:
+                lines.append(line)
+            else:
+                replace_idx = randint(0, i)
+                if replace_idx < n:
+                    lines[replace_idx] = line
+        print "".join(lines),
 
 
 @command('local-shuffle')
@@ -152,10 +167,11 @@ def local_shuffle(bed, loc='500000'):
     from random import randint
     if str(loc).isdigit():
         dist = abs(int(loc))
-        for toks in (l.rstrip('\r\n').split('\t') for l in nopen(bed)):
-            d = randint(-dist, dist)
-            toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
-            print "\t".join(toks)
+        with nopen(bed) as fh:
+            for toks in (l.rstrip('\r\n').split('\t') for l in fh):
+                d = randint(-dist, dist)
+                toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
+                print "\t".join(toks)
     else:
         # we are using dist as the windows within which to shuffle
         assert os.path.exists(loc)
@@ -341,6 +357,7 @@ def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
 
 def main():
     res = Run()
+
 
 if __name__ == "__main__":
     main()
