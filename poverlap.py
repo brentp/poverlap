@@ -76,7 +76,7 @@ def extend_bed(fin, fout, bases):
 
 
 @command('fixle')
-def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
+def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     """\
     from Haiminen et al in BMC Bioinformatics 2008, 9:336
     `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
@@ -89,10 +89,12 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
         type_col - the column in `bed` the lists the types
         n - number of shuffles
         metric - a string that indicates a program that consumes BED intervals
+        ncpus - number cpus to use. if a callable that does the parallelization
+                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
     """
     type_col -= 1
     n_btypes = 0
-    pool = Pool(NCPUS)
+    pmap = get_pmap(ncpus)
     with nopen(mktemp(), 'w') as afh, \
             nopen(mktemp(), 'w') as ofh, \
             nopen(mktemp(), 'w') as bfh:
@@ -115,7 +117,7 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
     res['shuffle_cmd'] = shuf_cmd
     res['metric'] = repr(metric)
-    sims = [int(x) for x in pool.imap(run, [(shuf_cmd, metric)] * n)]
+    sims = [int(x) for x in pmap(run, [(shuf_cmd, metric)] * n)]
     res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
     res['simulated_p'] = sum((s >= observed) for s in sims) / float(len(sims))
     res['sims'] = sims
@@ -226,6 +228,18 @@ def zclude(bed, other, exclude=True):
     return tmp
 
 
+def get_pmap(ncpus):
+    if ncpus in ('1', 1, None):
+        pmap = map
+    elif isinstance(ncpus, (basestring, int)):
+        ncpus = int(ncpus)
+        if ncpus == -1: ncpus = cpu_count()
+        pmap = Pool(ncpus).imap
+    else:
+        pmap = ncpus
+        assert hasattr(pmap, "__call__"), pmap
+    return pmap
+
 @command('poverlap')
 def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
              exclude=None, include=None, shuffle_both=False,
@@ -264,15 +278,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         ncpus - number cpus to use. if a callable that does the parallelization
                 e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
     """
-    if ncpus in ('1', 1, None):
-        pmap = map
-    elif isinstance(ncpus, (basestring, int)):
-        ncpus = int(ncpus)
-        if ncpus == -1: ncpus = cpu_count()
-        pmap = Pool(ncpus).imap
-    else:
-        pmap = ncpus
-        assert hasattr(pmap, "__call__"), pmap
+    pmap = get_pmap(ncpus)
 
     assert os.path.exists(genome), (genome, "not available")
 
