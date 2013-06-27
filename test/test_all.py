@@ -11,6 +11,8 @@ def mymetric(fh):
 
 def check_attributes(res):
     d = json.loads(res)
+    assert len(d) > 0
+    d = d.itervalues().next()
     for k in ("sims", "metric", "observed", "shuffle_cmd"):
         assert k in d, (k, d)
 
@@ -43,4 +45,14 @@ def test_cpu_count():
             metric='wc -l', n=20, ncpus=2)
     assert isinstance(res, basestring)
     yield check_attributes, res
+
+def test_multi_metric():
+    res = poverlap('test/data/a.bed', 'test/data/b.bed', 'data/hg19.genome',
+            metric=('wc -l', mymetric), n=20, ncpus=2)
+    assert isinstance(res, basestring)
+    d = json.loads(res)
+    assert len(d) == 2, d
+
+
+
 

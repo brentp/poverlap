@@ -328,16 +328,21 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         shuf_cmd = ("bedtools intersect -wa -a {a} -b "
                     "<(python {script} local-shuffle {b} --loc {shuffle_loc})"
                     ).format(**locals())
+    if not isinstance(metric, (tuple, list)):
+        metric = [metric]
+    full_res = {}
+    for met in metric:
+        observed = run_metric(orig_cmd, met)
+        res = {"observed": observed, "shuffle_cmd": shuf_cmd}
+        sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, met)] * n)]
+        res['metric'] = repr(metric)
+        res['simulated mean metric'] = (sum(sims) / float(len(sims)))
+        res['simulated_p'] = \
+            (sum((s >= observed) for s in sims) / float(len(sims)))
+        res['sims'] = sims
+        full_res[repr(met)] = res
 
-    observed = run_metric(orig_cmd, metric)
-    res = {"observed": observed, "shuffle_cmd": shuf_cmd}
-    sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, metric)] * n)]
-    res['metric'] = repr(metric)
-    res['simulated mean metric'] = (sum(sims) / float(len(sims)))
-    res['simulated_p'] = \
-        (sum((s >= observed) for s in sims) / float(len(sims)))
-    res['sims'] = sims
-    return json.dumps(res)
+    return json.dumps(full_res)
 
 def main():
     if "--ncpus" in sys.argv:
