@@ -234,7 +234,19 @@ def get_pmap(ncpus):
     elif isinstance(ncpus, (basestring, int)):
         ncpus = int(ncpus)
         if ncpus == -1: ncpus = cpu_count()
-        pmap = Pool(ncpus).imap
+        pool = Pool(ncpus)
+
+        ############################################################ 
+        # this block seems to be necessary to avoid errors at exit #
+        ############################################################ 
+        import atexit
+        def term():
+            try: pool.terminate()
+            except: pass
+        atexit.register(term)
+        ############################################################ 
+
+        pmap = pool.imap
     else:
         pmap = ncpus
         assert hasattr(pmap, "__call__"), pmap
