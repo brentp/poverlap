@@ -28,6 +28,12 @@ def test_string_metric():
     assert isinstance(res, basestring)
     yield check_attributes, res
 
+def test_fixle():
+    res = fixle('test/data/haim.test.bed', 'CTCF', 'Pol2', n=20)
+    d = json.loads(res)
+    assert len(d) == 1
+    yield check_attributes, res
+
 def test_map_fn():
     res = poverlap('test/data/a.bed', 'test/data/b.bed', 'data/hg19.genome',
             metric='wc -l', n=20, ncpus=map)

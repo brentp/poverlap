@@ -110,21 +110,10 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
 
     a, b, other = afh.name, bfh.name, ofh.name
     orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
-    observed = int(run_metric(orig_cmd, metric))
-    res = {"observed": observed}
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
-    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None))
-    """
-    res['shuffle_cmd'] = shuf_cmd
-    res['metric'] = repr(metric)
-    sims = [int(x) for x in pmap(run, [(shuf_cmd, metric)] * n)]
-    res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
-    res['simulated_p'] = sum((s >= observed) for s in sims) / float(len(sims))
-    res['sims'] = sims
-    return json.dumps(res)
-    """
+    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
 
 
 @command('bed-sample')
@@ -342,7 +331,7 @@ def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
         observed = run_metric(orig_cmd, met)
         res = {"observed": observed, "shuffle_cmd": shuf_cmd}
         sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, met)] * n)]
-        res['metric'] = repr(metric)
+        res['metric'] = repr(met)
         res['simulated mean metric'] = (sum(sims) / float(len(sims)))
         res['simulated_p'] = \
             (sum((s >= observed) for s in sims) / float(len(sims)))
