@@ -92,7 +92,8 @@ def extend_bed(fin, fout, bases):
 @command('fixle')
 def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     """\
-    from Haiminen et al in BMC Bioinformatics 2008, 9:336
+    from Haiminen et al in BMC Bioinformatics 2008, 9:336 (and IIUC alos in R's
+    coocurr.
     `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
     we keep the rows labeled as `atype` in the same locations, but we randomly
     assign `btype` to any of the remaining rows.
