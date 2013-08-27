@@ -30,8 +30,20 @@ def mktemp(*args, **kwargs):
 
 
 def run(cmd):
-    return list(nopen("|%s" % cmd.lstrip("|")))[0]
+    proc = nopen("|%s" % cmd.lstrip("|"), mode=None)
+    ret = proc.stdout.next()
+    check_proc(proc, cmd)
+    return ret
 
+def check_proc(proc, cmd=''):
+    err = proc.stderr.read().strip()
+    proc.terminate()
+    if proc.returncode not in (0, None):
+        sys.stderr.write("%s\n%s\n\%s" % (cmd, err, proc.returncode))
+        raise Exception(err)
+    if err: sys.stderr.write(err)
+    proc.stdout.close(); proc.stderr.close()
+    del proc
 
 def run_metric(cmd, metric=None):
     """
@@ -55,7 +67,9 @@ def run_metric(cmd, metric=None):
     if isinstance(metric, basestring):
         return float(run("%s | %s" % (cmd, metric)))
     else:
-        res = metric(nopen("|%s" % cmd))
+        proc = nopen("|%s" % cmd, mode=None)
+        res = metric(proc.stdout)
+        check_proc(proc, cmd)
         assert isinstance(res, (int, float))
         return res
 
@@ -76,9 +90,10 @@ def extend_bed(fin, fout, bases):
 
 
 @command('fixle')
-def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
+def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     """\
-    from Haiminen et al in BMC Bioinformatics 2008, 9:336
+    from Haiminen et al in BMC Bioinformatics 2008, 9:336 (and IIUC alos in R's
+    coocurr.
     `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
     we keep the rows labeled as `atype` in the same locations, but we randomly
     assign `btype` to any of the remaining rows.
@@ -89,10 +104,12 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
         type_col - the column in `bed` the lists the types
         n - number of shuffles
         metric - a string that indicates a program that consumes BED intervals
+        ncpus - number cpus to use. if a callable that does the parallelization
+                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
     """
     type_col -= 1
     n_btypes = 0
-    pool = Pool(NCPUS)
+    pmap = get_pmap(ncpus)
     with nopen(mktemp(), 'w') as afh, \
             nopen(mktemp(), 'w') as ofh, \
             nopen(mktemp(), 'w') as bfh:
@@ -108,18 +125,10 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100):
 
     a, b, other = afh.name, bfh.name, ofh.name
     orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
-    observed = int(run_metric(orig_cmd, metric))
-    res = {"observed": observed}
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
     shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
-    res['shuffle_cmd'] = shuf_cmd
-    res['metric'] = repr(metric)
-    sims = [int(x) for x in pool.imap(run, [(shuf_cmd, metric)] * n)]
-    res['simulated mean metric'] = "%.1f" % (sum(sims) / float(len(sims)))
-    res['simulated_p'] = sum((s >= observed) for s in sims) / float(len(sims))
-    res['sims'] = sims
-    return json.dumps(res)
+    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
 
 
 @command('bed-sample')
@@ -132,14 +141,15 @@ def bed_sample(bed, n=100):
     """
     n, lines = int(n), []
     from random import randint
-    for i, line in enumerate(nopen(bed)):
-        if i < n:
-            lines.append(line)
-        else:
-            replace_idx = randint(0, i)
-            if replace_idx < n:
-                lines[replace_idx] = line
-    print "".join(lines),
+    with nopen(bed) as fh:
+        for i, line in enumerate(nopen(fh)):
+            if i < n:
+                lines.append(line)
+            else:
+                replace_idx = randint(0, i)
+                if replace_idx < n:
+                    lines[replace_idx] = line
+        print "".join(lines),
 
 
 @command('local-shuffle')
@@ -158,10 +168,11 @@ def local_shuffle(bed, loc='500000'):
     from random import randint
     if str(loc).isdigit():
         dist = abs(int(loc))
-        for toks in (l.rstrip('\r\n').split('\t') for l in nopen(bed)):
-            d = randint(-dist, dist)
-            toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
-            print "\t".join(toks)
+        with nopen(bed) as fh:
+            for toks in (l.rstrip('\r\n').split('\t') for l in fh):
+                d = randint(-dist, dist)
+                toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
+                print "\t".join(toks)
     else:
         # we are using dist as the windows within which to shuffle
         assert os.path.exists(loc)
@@ -226,10 +237,34 @@ def zclude(bed, other, exclude=True):
     return tmp
 
 
+def get_pmap(ncpus):
+    if ncpus in ('1', 1, None):
+        pmap = map
+    elif isinstance(ncpus, (basestring, int)):
+        ncpus = int(ncpus)
+        if ncpus == -1: ncpus = cpu_count()
+        pool = Pool(ncpus)
+
+        ############################################################ 
+        # this block seems to be necessary to avoid errors at exit #
+        ############################################################ 
+        import atexit
+        def term():
+            try: pool.terminate()
+            except: pass
+        atexit.register(term)
+        ############################################################ 
+
+        pmap = pool.imap
+    else:
+        pmap = ncpus
+        assert hasattr(pmap, "__call__"), pmap
+    return pmap
+
 @command('poverlap')
 def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
              exclude=None, include=None, shuffle_both=False,
-             overlap_distance=0, shuffle_loc=None):
+             overlap_distance=0, shuffle_loc=None, ncpus=-1):
     """\
     poverlap is the main function that parallelizes testing overlap between `a`
     and `b`. It performs `n` shufflings and compares the observed number of
@@ -261,8 +296,11 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
                       then this should be a BED file containing regions such
                       that each interval in `bed` is shuffled within its
                       containing interval in `dist`
+        ncpus - number cpus to use. if a callable that does the parallelization
+                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
     """
-    pool = Pool(NCPUS)
+    pmap = get_pmap(ncpus)
+
     assert os.path.exists(genome), (genome, "not available")
 
     n = int(n)
@@ -300,19 +338,27 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
                     "<(python {script} local-shuffle {b} --loc {shuffle_loc})"
                     ).format(**locals())
 
-    observed = run_metric(orig_cmd, metric)
-    res = {"observed": observed, "shuffle_cmd": shuf_cmd}
-    sims = [int(x) for x in pool.imap(run_metric, [(shuf_cmd, metric)] * n)]
-    res['metric'] = repr(metric)
-    res['simulated mean metric'] = (sum(sims) / float(len(sims)))
-    res['simulated_p'] = \
-        (sum((s >= observed) for s in sims) / float(len(sims)))
-    res['sims'] = sims
-    return json.dumps(res)
+    return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
+
+def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
+    if not isinstance(metric, (tuple, list)):
+        metric = [metric]
+    full_res = {}
+    for met in metric:
+        observed = run_metric(orig_cmd, met)
+        res = {"observed": observed, "shuffle_cmd": shuf_cmd}
+        sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, met)] * n)]
+        res['metric'] = repr(met)
+        res['simulated mean metric'] = (sum(sims) / float(len(sims)))
+        res['simulated_p'] = \
+            (sum((s >= observed) for s in sims) / float(len(sims)))
+        res['sims'] = sims
+        full_res[repr(met)] = res
+    return full_res
+
+def main():
+    res = Run()
+
 
 if __name__ == "__main__":
-    if "--ncpus" in sys.argv:
-        i = sys.argv.index("--ncpus")
-        sys.argv.pop(i)
-        NCPUS = int(sys.argv.pop(i))
-    res = Run()
+    main()

@@ -69,8 +69,9 @@ of the TSS to anywhere within the gene-body.
             --shuffle_loc gene-bodies.bed \
             > res.gene-bodies.txt
 
-use Haiminen's method to shuffle to known sites. Here, a and b are a pair of TFs out of the
-50+ in the wgEncodeRegTfbsClusteredV2.bed.gz
+It is possible to use Haiminen's method to shuffle to known sites.
+Here, a and b are a pair of TFs out of the 50+ in the
+wgEncodeRegTfbsClusteredV2.bed.gz
 
     ./poverlap.py fixle \
         wgEncodeRegTfbsClusteredV2.bed.gz a.bed b.bed > res.fixle.haimenin.txt
