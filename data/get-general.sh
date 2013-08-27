@@ -1,8 +1,11 @@
+set -ex
 for g in hg18 hg19 mm8 mm9; do
     #mysql --user=genome --host=genome-mysql.cse.ucsc.edu -A -e \
     #            "select chrom, size from $g.chromInfo"  > data/$g.genome
     mysql --user=genome --host=genome-mysql.cse.ucsc.edu -A -e \
-                "select chrom, chromStart, chromEnd, name from $g.cpgIslandExt"  > data/cpgIsland.$g.bed
+            "select chrom, chromStart as start, chromEnd as end, name from $g.cpgIslandExt" \
+            | awk 'BEGIN{FS=OFS="\t"}(NR == 1){ print "#"$0"\tfeature" } (NR > 1){ gsub(" ", "", $4); print $1,$2-2000,$2,$4,"shore"; print $0,"island"; print $1,$3,$3+2000,$4,"shore" }' \
+                > data/cpgIsland.$g.bed
 done
 
 exit;
