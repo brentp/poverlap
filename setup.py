@@ -30,7 +30,7 @@ setup(name='poverlap',
     test_suite='nose.collector',
     zip_safe=False,
     install_requires=install_requires,
-    requires=['commandr'],
+    requires=['commandr', 'toolshed'],
     #entry_points={
     #    'console_scripts':
     #        ['poverlap=poverlap:main']
