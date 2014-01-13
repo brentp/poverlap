@@ -19,7 +19,7 @@ features:
     shuffle only the `b` BED file. However, both files may be shuffled with
     `shuffle_both` argument to poverlap.
 
- 3) This implements the sampling schema defined in Haminen et al in BMC
+ 3) This implements the sampling schema defined in Haiminen et al in BMC
     Bioinformatics 9: 336, whereby we give a list of possible locations,
     like the locations of a set of transcriptions factors, and we wish to
     see how two of them, CTCF and Pol2 for example, are related. To do this,
@@ -76,7 +76,7 @@ wgEncodeRegTfbsClusteredV2.bed.gz
     ./poverlap.py fixle \
         wgEncodeRegTfbsClusteredV2.bed.gz \
         a.bed b.bed \
-        > res.fixle.haimenin.txt
+        > res.fixle.haiminen.txt
 
 simple bedtools shuffle
 
