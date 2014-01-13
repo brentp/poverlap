@@ -1,13 +1,13 @@
 #!/usr/bin/env python
-import sys
+
 import os
+import sys
+import json
+from commandr import command, Run
+from toolshed import nopen, reader
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool
-from toolshed import nopen, reader
 from tempfile import mktemp as _mktemp
-import atexit
-from commandr import command, Run
-import json
 
 from signal import signal, SIGPIPE, SIG_DFL
 signal(SIGPIPE,SIG_DFL)
@@ -35,6 +35,7 @@ def run(cmd):
     check_proc(proc, cmd)
     return ret
 
+
 def check_proc(proc, cmd=''):
     err = proc.stderr.read().strip()
     proc.terminate()
@@ -45,9 +46,10 @@ def check_proc(proc, cmd=''):
     proc.stdout.close(); proc.stderr.close()
     del proc
 
+
 def run_metric(cmd, metric=None):
     """
-    metric can be a string, e.g. "wc -l" or a python callable that consumes
+    Metric can be a string, e.g. "wc -l" or a python callable that consumes
     lines of input and returns a single value.
     e.g.
 
@@ -57,7 +59,7 @@ def run_metric(cmd, metric=None):
             val += float(line.split("\t")[4])
         return val
 
-    the lines sent to the metric function will be the result of bedtools
+    The lines sent to the metric function will be the result of bedtools
     intersect -wa -- so that both the -a and -b intervals will be present
     in each line.
     """
@@ -75,6 +77,8 @@ def run_metric(cmd, metric=None):
 
 
 def extend_bed(fin, fout, bases):
+    # `bedtools slop`
+
     # we're extending both a.bed and b.bed by this distance
     # so divide by 2.
     bases /= 2
@@ -92,11 +96,11 @@ def extend_bed(fin, fout, bases):
 @command('fixle')
 def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     """\
-    from Haiminen et al in BMC Bioinformatics 2008, 9:336 (and IIUC alos in R's
-    coocurr.
-    `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`
-    we keep the rows labeled as `atype` in the same locations, but we randomly
+    From Haiminen et al in BMC Bioinformatics 2008, 9:336 (and R's `cooccur`).
+    `bed` may contain, e.g. 20 TFBS as defined by the type in `type_col`.
+    We keep the rows labeled as `atype` in the same locations, but we randomly
     assign `btype` to any of the remaining rows.
+
     Arguments:
         bed - BED file with a column that delineates types
         atype - the query type, e.g. Pol2
@@ -104,8 +108,8 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
         type_col - the column in `bed` the lists the types
         n - number of shuffles
         metric - a string that indicates a program that consumes BED intervals
-        ncpus - number cpus to use. if a callable that does the parallelization
-                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
+        ncpus - number cpus to use -- if a callable does the parallelization
+                use, e.g. Pool(5).map or Ipython Client[:].map
     """
     type_col -= 1
     n_btypes = 0
@@ -134,7 +138,8 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
 @command('bed-sample')
 def bed_sample(bed, n=100):
     """\
-    choose n random lines from a bed file. uses reservoir sampling
+    Choose n random lines from a bed file. Uses reservoir sampling.
+
     Arguments:
         bed - a bed file
         n - number of lines to sample
@@ -155,13 +160,14 @@ def bed_sample(bed, n=100):
 @command('local-shuffle')
 def local_shuffle(bed, loc='500000'):
     """
-    randomize the location of each interval in `bed` by moving it's
+    Randomize the location of each interval in `bed` by moving its
     start location to within `loc` bp of its current location or to
-    it's containing interval in `loc`
+    its containing interval in `loc`.
+
     Arguments:
         bed - input bed file
-        loc - shuffle intervals to within this distance (+ or -)
-               if not an integer, then this should be a BED file containing
+        loc - shuffle intervals to within this distance (+ or -).
+               If not an integer, then this should be a BED file containing
                regions such that each interval in `bed` is shuffled within
                its containing interval in `loc`
     """
@@ -178,7 +184,7 @@ def local_shuffle(bed, loc='500000'):
         assert os.path.exists(loc)
         bed4 = mktemp()
         with open(bed4, 'w') as fh:
-            # this step is so we don't have to track the number of columns in a
+            # this step is so we don't have to track the number of columns in A
             for toks in reader(bed, header=False):
                 fh.write("%s\t%s\n" % ("\t".join(toks[:3]), SEP.join(toks)))
 
@@ -216,8 +222,8 @@ def local_shuffle(bed, loc='500000'):
 
 def zclude(bed, other, exclude=True):
     """
-    include or exclude intervals from bed that overlap other
-    if exclude is True:
+    Include or exclude intervals from bed that overlap other.
+    If exclude is True:
         new = bedtools intersect -v -a bed -o other
     """
     if other is None: return bed
@@ -245,21 +251,22 @@ def get_pmap(ncpus):
         if ncpus == -1: ncpus = cpu_count()
         pool = Pool(ncpus)
 
-        ############################################################ 
+        ############################################################
         # this block seems to be necessary to avoid errors at exit #
-        ############################################################ 
+        ############################################################
         import atexit
         def term():
             try: pool.terminate()
             except: pass
         atexit.register(term)
-        ############################################################ 
+        ############################################################
 
         pmap = pool.imap
     else:
         pmap = ncpus
         assert hasattr(pmap, "__call__"), pmap
     return pmap
+
 
 @command('poverlap')
 def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
@@ -270,13 +277,13 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
     and `b`. It performs `n` shufflings and compares the observed number of
     lines in the intersection to the simulated intersections to generate a
     p-value.
+
     When using shuffle_loc, `exclude`, `include` and `chrom` are ignored.
     Args that are not explicitly part of BEDTools are explained below, e.g. to
     find intervals that are within a given distance, rather than fully
-    overlapping, one can set overlap_distance to > 0.
-    To shuffle intervals within a certain distance of their current location,
-    or to keep then inside a set of intervals, use shuffle_loc to retain the
-    local structure.
+    overlapping, one can set overlap_distance to > 0. To shuffle intervals
+    within a certain distance of their current location, or to keep them
+    inside a set of intervals, use shuffle_loc to retain the local structure.
 
     Arguments:
         a - first bed file
@@ -284,20 +291,20 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         genome - genome file
         metric - a string that indicates a program that consumes BED intervals
                  from STDIN and outputs a single, numerical value upon
-                 completion. default is 'wc -l'
+                 completion. Default is 'wc -l'
         n - number of shuffles
         chrom - shuffle within chromosomes
         exclude - optional bed file of regions to exclude
         include - optional bed file of regions to include
-        shuffle_both - if set, both a and b are shuffled. normally just b
-        overlap_distance - intervals within this distance are overlapping.
+        shuffle_both - if set, both A and B are shuffled. Default is B only.
+        overlap_distance - intervals within this distance are overlapping
         shuffle_loc - shuffle each interval to a random location within this
                       distance of its current location. If not an integer,
                       then this should be a BED file containing regions such
                       that each interval in `bed` is shuffled within its
-                      containing interval in `dist`
-        ncpus - number cpus to use. if a callable that does the parallelization
-                e.g., it could be, e.g. Pool(5).map or Ipython Client[:].map
+                      containing interval in `shuffle_loc`.
+        ncpus - number cpus to use -- if a callable does the parallelization
+                use, e.g. Pool(5).map or Ipython Client[:].map
     """
     pmap = get_pmap(ncpus)
 
@@ -340,6 +347,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
 
     return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
 
+
 def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
     if not isinstance(metric, (tuple, list)):
         metric = [metric]
@@ -355,6 +363,7 @@ def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
         res['sims'] = sims
         full_res[repr(met)] = res
     return full_res
+
 
 def main():
     res = Run()
