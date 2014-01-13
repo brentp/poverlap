@@ -3,7 +3,7 @@ Poverlap
 Simple, flexible, parallized significance testing of a pair of BED files.
 
 BEDTools offers the basic machinery to perform repeated randomization and
-overlap testing. 
+overlap testing.
 
 This script automatically parallelizes that process. It has these additional
 features:
@@ -20,16 +20,16 @@ features:
     `shuffle_both` argument to poverlap.
 
  3) This implements the sampling schema defined in Haminen et al in BMC
-    Bioinformatics 9: 336. Whereby we give a list of possible locations,
-    e.g. the locations of a set of transcriptions factors and we wish to
-    see how 2 of them e.g. CTCF and Pol2 are related. To do this, we fix
-    the locations of CTCF (from within the BED file) and we randomize the
-    location of Pol2 to any location occupied by a TF that is not CTCF.
+    Bioinformatics 9: 336, whereby we give a list of possible locations,
+    like the locations of a set of transcriptions factors, and we wish to
+    see how two of them, CTCF and Pol2 for example, are related. To do this,
+    we fix the locations of CTCF (from within the BED file) and we randomize
+    the location of Pol2 to any location occupied by a TF that is not CTCF.
 
 
 This is implemented as reservoir sampling. The command-line would look
 like:
-        
+
     ./poverlap.py fixle wgEncodeRegTfbsClusteredV2.bed.gz CTCF Pol2 --n 10
 
 For wgEncodeRegTfbsClusteredV2.bed.gz, which contains putative TFBS for
@@ -47,7 +47,7 @@ p-value is 0.
 
 Examples
 ========
-    
+
 shuffle b to within X bases of original location
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
@@ -74,34 +74,41 @@ Here, a and b are a pair of TFs out of the 50+ in the
 wgEncodeRegTfbsClusteredV2.bed.gz
 
     ./poverlap.py fixle \
-        wgEncodeRegTfbsClusteredV2.bed.gz a.bed b.bed > res.fixle.haimenin.txt
+        wgEncodeRegTfbsClusteredV2.bed.gz \
+        a.bed b.bed \
+        > res.fixle.haimenin.txt
 
 simple bedtools shuffle
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-        -g hg19.genome > res.shuffle-bt.txt
+        -g hg19.genome \
+        > res.shuffle-bt.txt
 
 bedtools exclude:
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-        -g hg19.genome --exclude repressed.encode.bed > res.shuffle_bt.exclude-repressed.txt
+        -g hg19.genome --exclude repressed.encode.bed \
+        > res.shuffle_bt.exclude-repressed.txt
 
 bedtools include:
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-        -g hg19.genome --include hg19.promoters.bed > res.shuffle_bt.include-promoters.txt
+        -g hg19.genome --include hg19.promoters.bed \
+        > res.shuffle_bt.include-promoters.txt
 
 bedtools include and exclude:
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-        -g hg19.genome --include hg19.promoters.bed --exclude repressed.encode.bed \
+        -g hg19.genome --include hg19.promoters.bed \
+        --exclude repressed.encode.bed \
         > res.shuffle_bt.include-promoters.exclude-repressed.txt
 
 Call intervals within 40kb of another as "overlapping". Note, this is different
 from shuffle\_distance which determines where the interval can go.
 
     ./poverlap.py poverlap --a a.bed --b b.bed \
-        --overlap_distance 40000 -g hg19.genome > res.shuffle-bt-within-40kb.txt
+        --overlap_distance 40000 -g hg19.genome \
+        > res.shuffle-bt-within-40kb.txt
 
 Installation
 ============
@@ -127,23 +134,28 @@ The best way to understand is to use the script. E.g start with:
 When using shuffle_loc, `exclude`, `include` and `chrom` are ignored.
 Args that are not explicitly part of BEDTools are explained below, e.g. to
 find intervals that are within a given distance, rather than fully
-overlapping, one can set overlap_distance to > 0.
-To shuffle intervals within a certain distance of their current location,
-use shuffle_loc to retain the local structure.
+overlapping, one can set overlap_distance to > 0. To shuffle intervals
+within a certain distance of their current location, or to keep them
+inside a set of intervals, use shuffle_loc to retain the local structure.
 
 Arguments:
 
     a - first bed file
     b - second bed file
     genome - genome file
+    metric - a string that indicates a program that consumes BED intervals
+             from STDIN and outputs a single, numerical value upon
+             completion. Default is 'wc -l'
     n - number of shuffles
     chrom - shuffle within chromosomes
     exclude - optional bed file of regions to exclude
     include - optional bed file of regions to include
-    shuffle_both - if set, both a and b are shuffled. normally just b
-    overlap_distance - intervals within this distance are overlapping.
-    shuffle_loc - randomize the start of each interval to a random
-                  location within this distance of its current location.
-                   or if a BED file is given, then randomize the intervals in
-                   `b` to an random location within the containing interval in
-                   shuffle_loc
+    shuffle_both - if set, both A and B are shuffled. Default is B only.
+    overlap_distance - intervals within this distance are overlapping
+    shuffle_loc - shuffle each interval to a random location within this
+                  distance of its current location. If not an integer,
+                  then this should be a BED file containing regions such
+                  that each interval in `bed` is shuffled within its
+                  containing interval in `shuffle_loc`.
+    ncpus - number cpus to use -- if a callable does the parallelization
+            use, e.g. Pool(5).map or Ipython Client[:].map
