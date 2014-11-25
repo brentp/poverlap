@@ -31,7 +31,7 @@ def mktemp(*args, **kwargs):
 
 def run(cmd):
     proc = nopen("|%s" % cmd.lstrip("|"), mode=None)
-    ret = proc.stdout.next()
+    ret = next(proc.stdout).strip() or '0'
     check_proc(proc, cmd)
     return ret
 
@@ -60,7 +60,7 @@ def run_metric(cmd, metric=None):
         return val
 
     The lines sent to the metric function will be the result of bedtools
-    intersect -wa -- so that both the -a and -b intervals will be present
+    intersect -wo -- so that both the -a and -b intervals will be present
     in each line.
     """
 
@@ -128,10 +128,10 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
     assert n_btypes > 0, ("no intervals found for", btype)
 
     a, b, other = afh.name, bfh.name, ofh.name
-    orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
+    orig_cmd = "bedtools intersect -wo -a {a} -b {b}".format(**locals())
     script = __file__
     bsample = '<(python {script} bed-sample {other} --n {n_btypes})'.format(**locals())
-    shuf_cmd = "bedtools intersect -wa -a {a} -b {bsample}".format(**locals())
+    shuf_cmd = "bedtools intersect -wo -a {a} -b {bsample}".format(**locals())
     return json.dumps(gen_results(orig_cmd, metric, pmap, n, shuf_cmd))
 
 
@@ -325,15 +325,15 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         a = extend_bed(a, mktemp(), overlap_distance)
         b = extend_bed(b, mktemp(), overlap_distance)
 
-    orig_cmd = "bedtools intersect -wa -a {a} -b {b}".format(**locals())
+    orig_cmd = "bedtools intersect -wo -a {a} -b {b}".format(**locals())
 
     if shuffle_loc is None:
         # use bedtools shuffle
         if shuffle_both:
-            a = ("<(bedtools shuffle {exclude} {include} -i {a} -g {genome} "
+            a = ("<(bedtools shuffle -allowBeyondChromEnd {exclude} {include} -i {a} -g {genome} "
                  "{chrom})".format(**locals()))
-        shuf_cmd = ("bedtools intersect -wa -a {a} -b "
-                    "<(bedtools shuffle {exclude} {include} -i {b} -g {genome}"
+        shuf_cmd = ("bedtools intersect -wo -a {a} -b "
+                    "<(bedtools shuffle -allowBeyondChromEnd {exclude} {include} -i {b} -g {genome}"
                     " {chrom})".format(**locals()))
     else:
         # use python shuffle ignores --chrom and --genome
@@ -341,7 +341,7 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
         if shuffle_both:
             a = "<(python {script} local-shuffle {a} --loc {shuffle_loc})"\
                 .format(**locals())
-        shuf_cmd = ("bedtools intersect -wa -a {a} -b "
+        shuf_cmd = ("bedtools intersect -wo -a {a} -b "
                     "<(python {script} local-shuffle {b} --loc {shuffle_loc})"
                     ).format(**locals())
 
@@ -358,12 +358,13 @@ def gen_results(orig_cmd, metric, pmap, n, shuf_cmd=None):
         sims = [int(x) for x in pmap(run_metric, [(shuf_cmd, met)] * n)]
         res['metric'] = repr(met)
         res['simulated mean metric'] = (sum(sims) / float(len(sims)))
+
+        # lowest possible p is 1 / (1 + n_sims)
         res['simulated_p'] = \
-            (sum((s >= observed) for s in sims) / float(len(sims)))
-        res['sims'] = sims
+            ((1 + sum((s >= observed) for s in sims)) / (1 + float(len(sims))))
+        #res['sims'] = sims
         full_res[repr(met)] = res
     return full_res
-
 
 def main():
     res = Run()
