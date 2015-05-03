@@ -8,9 +8,10 @@ from toolshed import nopen, reader
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool
 from tempfile import mktemp as _mktemp
+import atexit
 
 from signal import signal, SIGPIPE, SIG_DFL
-signal(SIGPIPE,SIG_DFL)
+signal(SIGPIPE, SIG_DFL)
 
 NCPUS = cpu_count()
 if NCPUS > 4: NCPUS -= 1
@@ -254,7 +255,6 @@ def get_pmap(ncpus):
         ############################################################
         # this block seems to be necessary to avoid errors at exit #
         ############################################################
-        import atexit
         def term():
             try: pool.terminate()
             except: pass
