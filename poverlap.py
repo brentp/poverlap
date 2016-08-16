@@ -21,7 +21,8 @@ SEP = "&*#Z"
 
 def mktemp(*args, **kwargs):
     def rm(f):
-        try: os.unlink(f)
+        if f is None: return
+        try: import os; os.unlink(f)
         except OSError: pass
 
     if not 'suffix' in kwargs: kwargs['suffix'] = ".bed"
@@ -29,6 +30,14 @@ def mktemp(*args, **kwargs):
     atexit.register(rm, f)
     return f
 
+def checkX(cmd):
+    for p in os.environ['PATH'].split(":"):
+        if os.access(os.path.join(p, cmd), os.X_OK):
+            break
+    else:
+        raise Exception("executable for '%s' not found" % cmd)
+
+checkX('bedtools')
 
 def run(cmd):
     proc = nopen("|%s" % cmd.lstrip("|"), mode=None)
@@ -308,7 +317,9 @@ def poverlap(a, b, genome=None, metric='wc -l', n=100, chrom=False,
     """
     pmap = get_pmap(ncpus)
 
-    assert os.path.exists(genome), (genome, "not available")
+    assert genome is not None and os.path.isfile(genome), (genome, "not available as a file")
+    assert os.path.isfile(a), (a, "not available as a file")
+    assert os.path.isfile(b), (b, "not available as a file")
 
     n = int(n)
     chrom = "" if chrom is False else "-chrom"

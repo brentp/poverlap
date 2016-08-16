@@ -13,7 +13,7 @@ def check_attributes(res):
     d = json.loads(res)
     assert len(d) > 0
     d = d.itervalues().next()
-    for k in ("sims", "metric", "observed", "shuffle_cmd"):
+    for k in ("metric", "observed", "shuffle_cmd"):
         assert k in d, (k, d)
 
 def test_python_metric():
@@ -64,7 +64,4 @@ def test_multi_metric():
     assert isinstance(res, basestring)
     d = json.loads(res)
     assert len(d) == 2, d
-
-
-
 
