@@ -99,7 +99,7 @@ def extend_bed(fin, fout, bases):
             if toks[1] > toks[2]:  # negative distances
                 toks[1] = toks[2] = (toks[1] + toks[2]) / 2
             assert toks[1] <= toks[2]
-            print >>fh, "\t".join(map(str, toks))
+            print("\t".join(map(str, toks)), file=fh)
     return fh.name
 
 
@@ -129,11 +129,11 @@ def fixle(bed, atype, btype, type_col=4, metric='wc -l', n=100, ncpus=-1):
             nopen(mktemp(), 'w') as bfh:
         for toks in (l.rstrip("\r\n").split("\t") for l in nopen(bed)):
             if toks[type_col] == atype:
-                print >> afh, "\t".join(toks)
+                print("\t".join(toks), file=afh)
             else:
-                print >> ofh, "\t".join(toks)
+                print("\t".join(toks), file=ofh)
                 if toks[type_col] == btype:
-                    print >>bfh, "\t".join(toks)
+                    print("\t".join(toks), file=bfh)
                     n_btypes += 1
     assert n_btypes > 0, ("no intervals found for", btype)
 
@@ -164,7 +164,7 @@ def bed_sample(bed, n=100):
                 replace_idx = randint(0, i)
                 if replace_idx < n:
                     lines[replace_idx] = line
-        print "".join(lines),
+        print("".join(lines), end="")
 
 
 @command('local-shuffle')
@@ -188,7 +188,7 @@ def local_shuffle(bed, loc='500000'):
             for toks in (l.rstrip('\r\n').split('\t') for l in fh):
                 d = randint(-dist, dist)
                 toks[1:3] = [str(max(0, int(bloc) + d)) for bloc in toks[1:3]]
-                print "\t".join(toks)
+                print("\t".join(toks))
     else:
         # we are using dist as the windows within which to shuffle
         assert os.path.exists(loc)
@@ -223,7 +223,7 @@ def local_shuffle(bed, loc='500000'):
             a[1], a[2] = map(str, (astart, aend) if astart < aend
                              else (aend, astart))
 
-            print "\t".join(a)
+            print("\t".join(a))
         if missing > 0:
             print >> sys.stderr, ("found {missing} intervals in {bed} that "
                                   " were not contained in {loc}"
@@ -248,8 +248,8 @@ def zclude(bed, other, exclude=True):
     n_after = sum(1 for _ in nopen(tmp))
     clude = "exclud" if exclude else "includ"
     pct = 100 * float(n_orig - n_after) / n_orig
-    print >>sys.stderr, ("reduced {bed} from {n_orig} to {n_after} "
-             "{pct:.3f}% by {clude}ing {other}").format(**locals())
+    print(("reduced {bed} from {n_orig} to {n_after} "
+             "{pct:.3f}% by {clude}ing {other}").format(**locals()), file=sys.stderr)
     return tmp
 
 
